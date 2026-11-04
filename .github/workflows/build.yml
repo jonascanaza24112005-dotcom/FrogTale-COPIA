@@ -1,7 +1,15 @@
+name: Build and Zip Unity Game
+
+on:
+  push:
+    tags:
+      - 'v*' # Se activa únicamente al subir tags que comiencen con "v" (ej: v1.0.0)
+  workflow_dispatch: # Permite ejecutarlo manualmente desde la pestaña Actions
+
 jobs:
   buildAndZip:
     name: Build & Package 📦
-    runs-on: self-hosted
+    runs-on: windows-latest # Ejecutor nativo de Windows para compatibilidad con Wwise
 
     steps:
       - name: Checkout repository
@@ -15,7 +23,7 @@ jobs:
           path: Library
           key: Library-StandaloneWindows64-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
 
-      # 1. Extraer nombre y versión (adaptado a PowerShell para Windows)
+      # 1. Obtener Nombre y Versión desde ProjectSettings.asset
       - name: Extract Unity Project Name and Version
         id: vars
         shell: pwsh
@@ -26,7 +34,7 @@ jobs:
           
           echo "ZIP_NAME=${safeName}_v${version}" >> $env:GITHUB_ENV
 
-      # 2. Compilar el proyecto en Windows
+      # 2. Compilar el Proyecto en Windows
       - name: Build Unity Project
         uses: game-ci/unity-builder@v4
         env:
@@ -37,14 +45,14 @@ jobs:
           targetPlatform: StandaloneWindows64
           allowDirtyBuild: true
 
-      # 3. Comprimir la carpeta en Windows usando Compress-Archive
-      - name: Zip Build Folder
+      # 3. Crear la carpeta "Builds" y comprimir el resultado
+      - name: Zip Build Folder into Builds directory
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path Builds
           Compress-Archive -Path "build/StandaloneWindows64/*" -DestinationPath "Builds/$env:ZIP_NAME.zip"
 
-      # 4. Subir el artefacto
+      # 4. Subir el archivo .zip ubicado en la carpeta Builds como artefacto
       - name: Upload Zip Artifact
         uses: actions/upload-artifact@v4
         with:
