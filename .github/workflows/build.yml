@@ -1,4 +1,4 @@
-name: Build and Zip Unity Game
+name: Build and Zip Unity Game #2
 
 on:
   push:
