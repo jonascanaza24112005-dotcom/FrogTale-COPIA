@@ -1,15 +1,8 @@
-name: Build and Zip Unity Game
-
-on:
-  push:
-    tags:
-      - 'v*' # Se activa únicamente al subir tags que comiencen con "v" (ej: v1.0.0, v0.1)
-  workflow_dispatch: # Permite ejecutarlo manualmente desde la pestaña Actions si lo necesitas
-
 jobs:
   buildAndZip:
     name: Build & Package 📦
-    runs-on: ubuntu-latest
+    runs-on: windows-latest # <-- Cambiado a Windows
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,21 +15,18 @@ jobs:
           path: Library
           key: Library-StandaloneWindows64-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
 
-      # 1. Obtener Nombre y Versión desde ProjectSettings.asset
+      # 1. Extraer nombre y versión (adaptado a PowerShell para Windows)
       - name: Extract Unity Project Name and Version
         id: vars
+        shell: pwsh
         run: |
-          GAME_NAME=$(grep 'productName:' ProjectSettings/ProjectSettings.asset | head -n 1 | sed 's/.*productName: //;s/[[:space:]]*$//' | tr -d '\r')
-          GAME_VERSION=$(grep 'bundleVersion:' ProjectSettings/ProjectSettings.asset | head -n 1 | sed 's/.*productName: //;s/[[:space:]]*$//' | tr -d '\r')
+          $name = (Select-String -Path "ProjectSettings/ProjectSettings.asset" -Pattern "productName:").Line -replace '.*productName:\s*', ''
+          $version = (Select-String -Path "ProjectSettings/ProjectSettings.asset" -Pattern "bundleVersion:").Line -replace '.*bundleVersion:\s*', ''
+          $safeName = $name -replace '[^a-zA-Z0-9._-]', '_'
           
-          # Formatear el nombre para reemplazar espacios por guiones
-          SAFE_NAME=$(echo "$GAME_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g')
-          
-          echo "GAME_NAME=$GAME_NAME"
-          echo "GAME_VERSION=$GAME_VERSION"
-          echo "ZIP_NAME=${SAFE_NAME}_v${GAME_VERSION}" >> $GITHUB_ENV
+          echo "ZIP_NAME=${safeName}_v${version}" >> $env:GITHUB_ENV
 
-      # 2. Compilar el Proyecto
+      # 2. Compilar el proyecto en Windows
       - name: Build Unity Project
         uses: game-ci/unity-builder@v4
         env:
@@ -47,14 +37,14 @@ jobs:
           targetPlatform: StandaloneWindows64
           allowDirtyBuild: true
 
-      # 3. Crear carpeta "Builds" y empaquetar el .zip dentro de ella
-      - name: Zip Build Folder into Builds directory
+      # 3. Comprimir la carpeta en Windows usando Compress-Archive
+      - name: Zip Build Folder
+        shell: pwsh
         run: |
-          mkdir -p Builds
-          cd build/StandaloneWindows64
-          zip -r "../../Builds/${{ env.ZIP_NAME }}.zip" .
+          New-Item -ItemType Directory -Force -Path Builds
+          Compress-Archive -Path "build/StandaloneWindows64/*" -DestinationPath "Builds/$env:ZIP_NAME.zip"
 
-      # 4. Subir el archivo .zip ubicado en la carpeta Builds como artefacto
+      # 4. Subir el artefacto
       - name: Upload Zip Artifact
         uses: actions/upload-artifact@v4
         with:
