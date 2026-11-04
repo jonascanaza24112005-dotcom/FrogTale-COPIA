@@ -1,4 +1,4 @@
-name: Build and Zip Unity Game #2
+name: Build and Zip Unity Game #3
 
 on:
   push:
@@ -48,6 +48,7 @@ jobs:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
           targetPlatform: StandaloneWindows64
+          allowDirtyBuild: true
 
       # 3. Comprimir la carpeta de salida en un archivo .zip
       - name: Zip Build Folder
