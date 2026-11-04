@@ -1,0 +1,63 @@
+name: Build and Zip Unity Game
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  buildAndZip:
+    name: Build & Package 📦
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Library folder
+        uses: actions/cache@v3
+        with:
+          path: Library
+          key: Library-StandaloneWindows64-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+
+      # 1. Obtener Nombre y Versión desde ProjectSettings.asset
+      - name: Extract Unity Project Name and Version
+        id: vars
+        run: |
+          GAME_NAME=$(grep 'productName:' ProjectSettings/ProjectSettings.asset | head -n 1 | sed 's/.*productName: //;s/[[:space:]]*$//' | tr -d '\r')
+          GAME_VERSION=$(grep 'bundleVersion:' ProjectSettings/ProjectSettings.asset | head -n 1 | sed 's/.*bundleVersion: //;s/[[:space:]]*$//' | tr -d '\r')
+          
+          # Formatear el nombre para reemplazar espacios por guiones (evita problemas en nombres de archivo)
+          SAFE_NAME=$(echo "$GAME_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g')
+          
+          echo "GAME_NAME=$GAME_NAME"
+          echo "GAME_VERSION=$GAME_VERSION"
+          echo "ZIP_NAME=${SAFE_NAME}_v${GAME_VERSION}" >> $GITHUB_ENV
+          
+          echo "Nombre extraído: $GAME_NAME"
+          echo "Versión extraída: $GAME_VERSION"
+          echo "Nombre del archivo ZIP: ${SAFE_NAME}_v${GAME_VERSION}.zip"
+
+      # 2. Compilar el Proyecto
+      - name: Build Unity Project
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          targetPlatform: StandaloneWindows64
+
+      # 3. Comprimir la carpeta de salida en un archivo .zip
+      - name: Zip Build Folder
+        run: |
+          cd build/StandaloneWindows64
+          zip -r "../../${{ env.ZIP_NAME }}.zip" .
+
+      # 4. Subir el archivo .zip como artefacto en GitHub
+      - name: Upload Zip Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ZIP_NAME }}
+          path: ${{ env.ZIP_NAME }}.zip
