@@ -3,13 +3,13 @@ name: Build and Zip Unity Game
 on:
   push:
     tags:
-      - 'v*' # Se activa únicamente al subir tags que comiencen con "v" (ej: v1.0.0)
-  workflow_dispatch: # Permite ejecutarlo manualmente desde la pestaña Actions
+      - '[0-9]*.[0-9]*.[0-9]*' # Se activa con tags numéricos como 1.0.0, 0.1.2, etc.
+  workflow_dispatch: # Permite ejecutarlo manualmente desde GitHub si es necesario
 
 jobs:
   buildAndZip:
     name: Build & Package 📦
-    runs-on: windows-latest # Ejecutor nativo de Windows para compatibilidad con Wwise
+    runs-on: windows-latest # Ejecutor nativo de Windows
 
     steps:
       - name: Checkout repository
@@ -23,16 +23,19 @@ jobs:
           path: Library
           key: Library-StandaloneWindows64-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
 
-      # 1. Obtener Nombre y Versión desde ProjectSettings.asset
+      # 1. Obtener Nombre del Repositorio y Versión de Unity
       - name: Extract Unity Project Name and Version
         id: vars
         shell: pwsh
         run: |
-          $name = (Select-String -Path "ProjectSettings/ProjectSettings.asset" -Pattern "productName:").Line -replace '.*productName:\s*', ''
+          $projectName = "${{ github.event.repository.name }}"
           $version = (Select-String -Path "ProjectSettings/ProjectSettings.asset" -Pattern "bundleVersion:").Line -replace '.*bundleVersion:\s*', ''
-          $safeName = $name -replace '[^a-zA-Z0-9._-]', '_'
           
-          echo "ZIP_NAME=${safeName}_v${version}" >> $env:GITHUB_ENV
+          # Formato exacto del nombre: NombreDeJuego Version (ej: FrogTale 1.0.0)
+          $zipName = "$projectName $version"
+          
+          echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
+          Write-Host "Nombre del ZIP: $zipName.zip"
 
       # 2. Compilar el Proyecto en Windows
       - name: Build Unity Project
@@ -45,14 +48,14 @@ jobs:
           targetPlatform: StandaloneWindows64
           allowDirtyBuild: true
 
-      # 3. Crear la carpeta "Builds" y comprimir el resultado
+      # 3. Crear la carpeta "Builds" y comprimir los archivos directamente (sin subcarpetas)
       - name: Zip Build Folder into Builds directory
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path Builds
-          Compress-Archive -Path "build/StandaloneWindows64/*" -DestinationPath "Builds/$env:ZIP_NAME.zip"
+          Get-ChildItem -Path "build/StandaloneWindows64/*" | Compress-Archive -DestinationPath "Builds/$env:ZIP_NAME.zip"
 
-      # 4. Subir el archivo .zip ubicado en la carpeta Builds como artefacto
+      # 4. Subir el archivo .zip ubicado en Builds como artefacto
       - name: Upload Zip Artifact
         uses: actions/upload-artifact@v4
         with:
