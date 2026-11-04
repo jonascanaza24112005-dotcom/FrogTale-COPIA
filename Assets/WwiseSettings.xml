@@ -12,7 +12,7 @@
   <ShowMissingRigidBodyWarning>true</ShowMissingRigidBodyWarning>
   <ShowSpatialAudioWarningMsg>true</ShowSpatialAudioWarningMsg>
   <WwiseInstallationPathMac />
-  <WwiseInstallationPathWindows>D:\Audiokinetic\Wwise_2025.1.12.9287</WwiseInstallationPathWindows>
+  <WwiseInstallationPathWindows>C:\Audiokinetic\Wwise_2025.1.12.9287</WwiseInstallationPathWindows>
   <WwiseProjectPath>../Desarrollo3_FrogTales_WwiseProject/Desarrollo3_FrogTales_WwiseProject.wproj</WwiseProjectPath>
   <UseWaapi>true</UseWaapi>
   <WaapiPort>8080</WaapiPort>
