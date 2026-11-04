@@ -1,7 +1,7 @@
 jobs:
   buildAndZip:
     name: Build & Package 📦
-    runs-on: windows-latest # <-- Cambiado a Windows
+    runs-on: self-hosted
 
     steps:
       - name: Checkout repository
