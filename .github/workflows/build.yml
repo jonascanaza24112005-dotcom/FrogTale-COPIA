@@ -1,81 +1,53 @@
-name: Build and Zip Unity Game
+name: Actions 😎
 
 on:
   push:
     tags:
-      - '[0-9]*.[0-9]*.[0-9]*' # Se activa EXCLUSIVAMENTE con tags de 3 dígitos (ej: 0.8.3, 1.0.0)
-  workflow_dispatch:
+      - '*'
 
 jobs:
-  buildAndZip:
-    name: Build & Package 📦
-    runs-on: windows-latest
-
+  build:
+    name: Build my project ✨
+    runs-on: ubuntu-latest
     steps:
+      # Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           lfs: true
 
-      - name: Cache Library folder
-        uses: actions/cache@v4
+      # Cache
+      - uses: actions/cache@v3
         with:
           path: Library
           key: Library-StandaloneWindows64-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-StandaloneWindows64-
+            Library-
 
-      # 1. Obtener Product Name de Unity y Versión del Tag
-      - name: Extract Unity Project Name and Version
-        id: vars
-        shell: pwsh
-        run: |
-          # 1. Extraer productName de ProjectSettings.asset
-          $nameMatch = Select-String -Path "ProjectSettings/ProjectSettings.asset" -Pattern "productName:\s*(.+)" | Select-Object -First 1
-          if ($nameMatch) {
-              $projectName = $nameMatch.Matches.Groups[1].Value.Trim() -replace '"',''
-          } else {
-              $projectName = "FrogTale"
-          }
-
-          # 2. Tomar la versión directamente del Tag de Git
-          if ("${{ github.ref_type }}" -eq "tag") {
-              $version = "${{ github.ref_name }}"
-          } else {
-              # Si es ejecución manual (workflow_dispatch), toma la última coincidencia de bundleVersion
-              $versionMatch = Select-String -Path "ProjectSettings/ProjectSettings.asset" -Pattern "bundleVersion:\s*(.+)" | Select-Object -Last 1
-              if ($versionMatch) {
-                  $version = $versionMatch.Matches.Groups[1].Value.Trim() -replace '"',''
-              } else {
-                  $version = "0.8.3"
-              }
-          }
-
-          # Formato final exacto: FrogTale 0.8.3
-          $zipName = "$projectName $version".Trim()
-
-          echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
-          Write-Host "Nombre del ZIP generado: $zipName.zip"
-
-      # 2. Compilar el Proyecto en Windows
-      - name: Build Unity Project
-        uses: game-ci/unity-builder@v4
+      # Test
+      - name: Run tests
+        uses: game-ci/unity-test-runner@v4
         env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build
+      - name: Build project
+        uses: game-ci/unity-builder@v4
+        env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           targetPlatform: StandaloneWindows64
-          allowDirtyBuild: true
+          versioning: Tag
 
-      # 3. Crear la carpeta "Builds" y comprimir el contenido de la raíz (sin subcarpetas)
-      - name: Zip Build Folder into Builds directory
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path Builds
-          Get-ChildItem -Path "build/StandaloneWindows64/*" | Compress-Archive -DestinationPath "Builds/$env:ZIP_NAME.zip"
-
-      # 4. Subir el archivo .zip ubicado en la carpeta Builds como artefacto
-      - name: Upload Zip Artifact
-        uses: actions/upload-artifact@v4
+      # Output
+      - uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ZIP_NAME }}
-          path: Builds/${{ env.ZIP_NAME }}.zip
+          name: Build-StandaloneWindows64-${{ github.ref_name }}
+          path: build
