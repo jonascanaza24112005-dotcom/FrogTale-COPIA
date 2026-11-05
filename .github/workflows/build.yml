@@ -3,70 +3,45 @@ name: Build
 on:
   push:
     tags:
-      - "*"            # se dispara al pushear un tag, ej: v0.1.0
-  workflow_dispatch:     # también permite correrlo a mano desde la pestaña Actions
+      - "*"
+  workflow_dispatch:
+
+env:
+  UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+  UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+  UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
 jobs:
   build:
-    name: Build ${{ matrix.targetPlatform }}
+    name: Build para Windows
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        targetPlatform:
-          - StandaloneWindows64
-          # - StandaloneLinux64
-          # - Android
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          lfs: true      # sacalo si no usan Git LFS
-
-      - name: Quitar Wwise (solo en el runner, no toca el repo)
-        run: |
-          rm -rf Assets/Wwise Assets/Wwise.meta
-          rm -rf Assets/StreamingAssets/Audio Assets/StreamingAssets/Audio.meta
-          rm -rf WwiseProject
-          # ajustá estos paths a donde tengan Wwise en tu proyecto
-
-      - name: Stub de Wwise para que compile
-        run: |
-          mkdir -p Assets/_CIStubs
-          cat > Assets/_CIStubs/WwiseStub.cs << 'EOF'
-          using UnityEngine;
-          public static class AkSoundEngine
-          {
-              public static uint PostEvent(string eventName, GameObject go) { return 0; }
-              public static uint PostEvent(uint eventId, GameObject go) { return 0; }
-          }
-          EOF
+          fetch-depth: 0
+          lfs: true
 
       - name: Cache de Library
         uses: actions/cache@v4
         with:
           path: Library
-          key: Library-${{ matrix.targetPlatform }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          key: Library-StandaloneWindows64-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
-            Library-${{ matrix.targetPlatform }}-
+            Library-StandaloneWindows64-
             Library-
 
-      - name: Build con Game CI
+      - name: Build con GameCI
         uses: game-ci/unity-builder@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
-          targetPlatform: ${{ matrix.targetPlatform }}
-          # unityVersion se lee solo de ProjectSettings/ProjectVersion.txt
-          versioning: None
+          targetPlatform: StandaloneWindows64
+          unityVersion: auto
           buildName: MiJuego
+          buildsPath: build
 
-      - name: Subir build como artifact
+      - name: Subir build
         uses: actions/upload-artifact@v4
         with:
-          name: Build-${{ matrix.targetPlatform }}-${{ github.ref_name }}
-          path: build/${{ matrix.targetPlatform }}
+          name: Build-Windows
+          path: build/StandaloneWindows64
           retention-days: 14
