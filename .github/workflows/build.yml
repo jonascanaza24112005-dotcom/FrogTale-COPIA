@@ -3,13 +3,13 @@ name: Build and Zip Unity Game
 on:
   push:
     tags:
-      - '[0-9]*.[0-9]*.[0-9]*' # Se activa con tags numéricos como 1.0.0, 0.1.2, etc.
-  workflow_dispatch: # Permite ejecutarlo manualmente desde GitHub si es necesario
+      - '[0-9]*.[0-9]*.[0-9]*' # Se activa con tags como 0.8.3, 1.0.0, etc.
+  workflow_dispatch:
 
 jobs:
   buildAndZip:
     name: Build & Package 📦
-    runs-on: windows-latest # Ejecutor nativo de Windows
+    runs-on: windows-latest
 
     steps:
       - name: Checkout repository
@@ -23,16 +23,21 @@ jobs:
           path: Library
           key: Library-StandaloneWindows64-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
 
-      # 1. Obtener Nombre del Repositorio y Versión de Unity
+      # 1. Obtener Product Name y Version directamente de ProjectSettings
       - name: Extract Unity Project Name and Version
         id: vars
         shell: pwsh
         run: |
-          $projectName = "${{ github.event.repository.name }}"
-          $version = (Select-String -Path "ProjectSettings/ProjectSettings.asset" -Pattern "bundleVersion:").Line -replace '.*bundleVersion:\s*', ''
+          # Extraer la primera coincidencia del nombre del producto configurado en Unity
+          $nameLine = Select-String -Path "ProjectSettings/ProjectSettings.asset" -Pattern "productName:" | Select-Object -First 1
+          $projectName = $nameLine.Line -replace '.*productName:\s*', '' -replace '"',''
           
-          # Formato exacto del nombre: NombreDeJuego Version (ej: FrogTale 1.0.0)
-          $zipName = "$projectName $version"
+          # Extraer la primera coincidencia de la versión configurada en Unity
+          $versionLine = Select-String -Path "ProjectSettings/ProjectSettings.asset" -Pattern "bundleVersion:" | Select-Object -First 1
+          $version = $versionLine.Line -replace '.*bundleVersion:\s*', '' -replace '"',''
+          
+          # Formato exacto del ZIP: FrogTale 0.8.3
+          $zipName = "$projectName $version".Trim()
           
           echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
           Write-Host "Nombre del ZIP: $zipName.zip"
@@ -48,14 +53,14 @@ jobs:
           targetPlatform: StandaloneWindows64
           allowDirtyBuild: true
 
-      # 3. Crear la carpeta "Builds" y comprimir los archivos directamente (sin subcarpetas)
+      # 3. Crear la carpeta "Builds" y comprimir el contenido de la raíz (sin subcarpetas)
       - name: Zip Build Folder into Builds directory
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path Builds
           Get-ChildItem -Path "build/StandaloneWindows64/*" | Compress-Archive -DestinationPath "Builds/$env:ZIP_NAME.zip"
 
-      # 4. Subir el archivo .zip ubicado en Builds como artefacto
+      # 4. Subir el archivo .zip ubicado en la carpeta Builds como artefacto
       - name: Upload Zip Artifact
         uses: actions/upload-artifact@v4
         with:
