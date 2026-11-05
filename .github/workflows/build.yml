@@ -1,44 +1,53 @@
-name: Actions 😎
+name: Build
 
 on:
   push:
     tags:
-      - '*'
-  workflow_dispatch:
+      - "v*"            # se dispara al pushear un tag, ej: v0.1.0
+  workflow_dispatch:     # también permite correrlo a mano desde la pestaña Actions
 
 jobs:
   build:
-    name: Build my project ✨
+    name: Build ${{ matrix.targetPlatform }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        targetPlatform:
+          - StandaloneWindows64
+          # - StandaloneLinux64
+          # - Android
+
     steps:
-      # Checkout
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          lfs: true
+          lfs: true      # sacalo si no usan Git LFS
 
-      # Cache
-      - uses: actions/cache@v3
+      - name: Cache de Library
+        uses: actions/cache@v4
         with:
           path: Library
-          key: Library-StandaloneWindows64-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          key: Library-${{ matrix.targetPlatform }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: |
-            Library-StandaloneWindows64-
+            Library-${{ matrix.targetPlatform }}-
             Library-
 
-      # Build
-      - name: Build project
+      - name: Build con Game CI
         uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
-          targetPlatform: StandaloneWindows64
-          versioning: Tag
+          targetPlatform: ${{ matrix.targetPlatform }}
+          # unityVersion se lee solo de ProjectSettings/ProjectVersion.txt
+          versioning: None
+          buildName: MiJuego
 
-      # Output
-      - uses: actions/upload-artifact@v4
+      - name: Subir build como artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: Build-StandaloneWindows64-${{ github.ref_name }}
-          path: build
+          name: Build-${{ matrix.targetPlatform }}-${{ github.ref_name }}
+          path: build/${{ matrix.targetPlatform }}
+          retention-days: 14
