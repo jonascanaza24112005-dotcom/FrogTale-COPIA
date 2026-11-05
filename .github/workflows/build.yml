@@ -3,7 +3,7 @@ name: Build and Zip Unity Game
 on:
   push:
     tags:
-      - '[0-9]*.[0-9]*.[0-9]*' # Se activa con tags como 0.8.3, 1.0.0, etc.
+      - '[0-9]*.[0-9]*.[0-9]*' # Se activa EXCLUSIVAMENTE con tags de 3 dígitos (ej: 0.8.3, 1.0.0)
   workflow_dispatch:
 
 jobs:
@@ -23,24 +23,37 @@ jobs:
           path: Library
           key: Library-StandaloneWindows64-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
 
-      # 1. Obtener Product Name y Version directamente de ProjectSettings
+      # 1. Obtener Product Name de Unity y Versión del Tag
       - name: Extract Unity Project Name and Version
         id: vars
         shell: pwsh
         run: |
-          # Extraer la primera coincidencia del nombre del producto configurado en Unity
-          $nameLine = Select-String -Path "ProjectSettings/ProjectSettings.asset" -Pattern "productName:" | Select-Object -First 1
-          $projectName = $nameLine.Line -replace '.*productName:\s*', '' -replace '"',''
-          
-          # Extraer la primera coincidencia de la versión configurada en Unity
-          $versionLine = Select-String -Path "ProjectSettings/ProjectSettings.asset" -Pattern "bundleVersion:" | Select-Object -First 1
-          $version = $versionLine.Line -replace '.*bundleVersion:\s*', '' -replace '"',''
-          
-          # Formato exacto del ZIP: FrogTale 0.8.3
+          # 1. Extraer productName de ProjectSettings.asset
+          $nameMatch = Select-String -Path "ProjectSettings/ProjectSettings.asset" -Pattern "productName:\s*(.+)" | Select-Object -First 1
+          if ($nameMatch) {
+              $projectName = $nameMatch.Matches.Groups[1].Value.Trim() -replace '"',''
+          } else {
+              $projectName = "FrogTale"
+          }
+
+          # 2. Tomar la versión directamente del Tag de Git
+          if ("${{ github.ref_type }}" -eq "tag") {
+              $version = "${{ github.ref_name }}"
+          } else {
+              # Si es ejecución manual (workflow_dispatch), toma la última coincidencia de bundleVersion
+              $versionMatch = Select-String -Path "ProjectSettings/ProjectSettings.asset" -Pattern "bundleVersion:\s*(.+)" | Select-Object -Last 1
+              if ($versionMatch) {
+                  $version = $versionMatch.Matches.Groups[1].Value.Trim() -replace '"',''
+              } else {
+                  $version = "0.8.3"
+              }
+          }
+
+          # Formato final exacto: FrogTale 0.8.3
           $zipName = "$projectName $version".Trim()
-          
+
           echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
-          Write-Host "Nombre del ZIP: $zipName.zip"
+          Write-Host "Nombre del ZIP generado: $zipName.zip"
 
       # 2. Compilar el Proyecto en Windows
       - name: Build Unity Project
