@@ -3,7 +3,7 @@ name: Build
 on:
   push:
     tags:
-      - "v*"            # se dispara al pushear un tag, ej: v0.1.0
+      - "*"            # se dispara al pushear un tag, ej: v0.1.0
   workflow_dispatch:     # también permite correrlo a mano desde la pestaña Actions
 
 jobs:
@@ -23,6 +23,25 @@ jobs:
         uses: actions/checkout@v4
         with:
           lfs: true      # sacalo si no usan Git LFS
+
+      - name: Quitar Wwise (solo en el runner, no toca el repo)
+        run: |
+          rm -rf Assets/Wwise Assets/Wwise.meta
+          rm -rf Assets/StreamingAssets/Audio Assets/StreamingAssets/Audio.meta
+          rm -rf WwiseProject
+          # ajustá estos paths a donde tengan Wwise en tu proyecto
+
+      - name: Stub de Wwise para que compile
+        run: |
+          mkdir -p Assets/_CIStubs
+          cat > Assets/_CIStubs/WwiseStub.cs << 'EOF'
+          using UnityEngine;
+          public static class AkSoundEngine
+          {
+              public static uint PostEvent(string eventName, GameObject go) { return 0; }
+              public static uint PostEvent(uint eventId, GameObject go) { return 0; }
+          }
+          EOF
 
       - name: Cache de Library
         uses: actions/cache@v4
