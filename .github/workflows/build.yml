@@ -38,6 +38,7 @@ jobs:
           unityVersion: auto
           buildName: MiJuego
           buildsPath: build
+          versioning: None
 
       - name: Subir build
         uses: actions/upload-artifact@v4
